@@ -166,9 +166,9 @@ namespace core{
 				imnodes_ctx = ImNodes::CreateContext();
 
 				if (!imgui_ctx 
-						//|| !implot_ctx 
-						//|| !implot3d_ctx 
-						//|| !imnodes_ctx
+						|| !implot_ctx 
+						|| !implot3d_ctx 
+						|| !imnodes_ctx
 				   ){
 					status = false;
 					reason = "[sdl_gl_imgui_ctx_manager]CreateContext";
@@ -189,9 +189,6 @@ namespace core{
 
 				status = true;
 
-				//default font
-				std::filesystem::path font_path = std::filesystem::path{SDL_GetBasePath()}
-					/ "fonts"/ "SarasaUiSC-Bold.ttf";
 
 				ImFontConfig f{};
 				//f.Flags = ImFontFlags_NoLoadError;
@@ -210,6 +207,10 @@ namespace core{
 					io.FontDefault = font;
 				}
 				#else
+				//default font
+				std::filesystem::path font_path = std::filesystem::path{SDL_GetBasePath()}
+					/ "fonts"/ "SarasaUiSC-Bold.ttf";
+
 				if (std::filesystem::exists(font_path)){
 					font = (*io.Fonts).AddFontFromFileTTF(font_path.c_str(),fontsize,&f,nullptr);
 					io.FontDefault = font;
