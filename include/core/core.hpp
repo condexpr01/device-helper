@@ -321,7 +321,7 @@ namespace core{
 			}
 
 			~sdl_window_manager() noexcept{
-				if(!window){SDL_DestroyWindow(window);}
+				if(window){SDL_DestroyWindow(window);}
 			}
 	};
 
@@ -416,7 +416,7 @@ namespace core{
 		public:
 			sdl_event_ctx &get_ctx() noexcept{return ctx;}
 
-			void loop() noexcept;
+			void loop();
 
 		//RAII
 		public:

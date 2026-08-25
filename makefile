@@ -1,5 +1,9 @@
 all:
-	-cmake -B build -G Ninja && cmake --build build
+	cmake -S . -B build -G Ninja && cmake --build build
+
+cross-mingw:
+	#cross compile on linux:
+	cmake -S . -B build -G Ninja -DCROSS_MINGW=ON && cmake --build build
 
 clean:
 	-rm -rf build

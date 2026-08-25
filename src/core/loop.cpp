@@ -398,6 +398,13 @@ void frame::draw_ui(core::sdl_event_ctx &ctx){
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+	ImGuiIO& io = ImGui::GetIO();
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+		ImGui::UpdatePlatformWindows();
+		ImGui::RenderPlatformWindowsDefault();
+		SDL_GL_MakeCurrent(ctx.swm.window, ctx.sgcm.gl_ctx);
+	}
 }
 
 void frame::init_frame(core::sdl_event_ctx &ctx){
@@ -420,6 +427,7 @@ void frame::render_frame(core::sdl_event_ctx &ctx){
 	#if 1
 		if(!SDL_GL_SwapWindow(ctx.swm.window)){
 			ctx.running = false;
+			ctx.status = false;
 			ctx.reason = "[prepare::render_frame]SDL_GL_SwapWindow";
 			return;
 		}
@@ -439,7 +447,7 @@ void frame::render_frame(core::sdl_event_ctx &ctx){
 }
 
 //call top in loop
-void core::sdl_event_manager::loop() noexcept{
+void core::sdl_event_manager::loop() {
 	prepare prepare;
 	frame frame;
 
@@ -1144,8 +1152,6 @@ void page_sdl_audio_content(core::sdl_event_ctx &ctx){
 		size_t callback_buf_size = ctx.callback_on_time_audio.get_buf().size();
 
 		ImGui::ProgressBar(callback_buf_size?(float)buf_wav_offset/(float)callback_buf_size:0.f);
-
-		ImGui::Text("%ld %ld %ld",buf_wav_offset,callback_buf_start,callback_buf_size);
 
 		if(ImGui::SliderScalar("read_pos",ImGuiDataType_U64,
 					&buf_wav_offset,&callback_buf_start,&callback_buf_size)){

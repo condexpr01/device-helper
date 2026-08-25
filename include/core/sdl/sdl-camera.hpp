@@ -88,6 +88,8 @@ namespace core{
 
 			void close_capture() noexcept{
 				if(cur_capt)SDL_CloseCamera(cur_capt);
+
+				cur_capt = nullptr;
 			}
 
 			//acquire frame
