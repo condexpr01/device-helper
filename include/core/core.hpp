@@ -15,10 +15,14 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
 
+#include <condition_variable>
 #include <filesystem>
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
+
+#include <mutex>
+#include <thread>
 
 #include <vector>
 
@@ -326,6 +330,140 @@ namespace core{
 			}
 	};
 
+
+	class sdl_tray_manager{
+		//error status
+		private:
+			bool status = false;
+			std::string reason;
+
+		//get error status methods
+		public:
+			bool       is_ok() noexcept{return status;}
+			const char* what() noexcept{return reason.c_str();}
+
+		private:
+			SDL_Surface *icon = nullptr;
+			SDL_Tray *tray = nullptr;
+
+			SDL_TrayMenu *tray_menu = nullptr;
+
+			SDL_TrayEntry *tray_entry_sep = nullptr;
+			SDL_TrayEntry *tray_entry_show_hide = nullptr;
+
+
+		public:
+			sdl_tray_manager(SDL_Window *window) noexcept{
+				
+				auto pngraw = romfs::get("icon/weapon.png");
+				if(pngraw.data()){
+					icon = SDL_LoadPNG_IO(SDL_IOFromMem((void*)pngraw.data(), pngraw.size()), true);
+				}
+
+				if(!icon){
+					status = false;
+					reason = "[sdl_tray_manager] icon nullptr";
+					return;
+				}
+
+				tray = SDL_CreateTray(icon,"tray");
+				if (!tray){status = false;reason = SDL_GetError();return;}
+
+				tray_menu = SDL_CreateTrayMenu(tray);
+				if (!tray_menu){status = false;reason = SDL_GetError();return;}
+
+				tray_entry_sep = SDL_InsertTrayEntryAt(tray_menu,-1,nullptr,0);
+				tray_entry_show_hide = SDL_InsertTrayEntryAt(tray_menu,-1,"show/hide",SDL_TRAYENTRY_CHECKBOX);
+
+				SDL_SetTrayEntryCallback(tray_entry_show_hide,[](void *userdata, SDL_TrayEntry *entry)->void{
+					if(!userdata)return;
+
+					if(SDL_GetWindowFlags((SDL_Window*)userdata) & SDL_WINDOW_HIDDEN){
+						SDL_ShowWindow((SDL_Window*)userdata);
+					}else{
+						SDL_HideWindow((SDL_Window*)userdata);
+					}
+
+				},window);
+
+			}
+
+			~sdl_tray_manager() noexcept{
+				if(tray)SDL_DestroyTray(tray);
+				if(icon)SDL_DestroySurface(icon);
+			}
+	};
+
+
+	class cmd_worker{
+		public:
+			class worker_status{
+				public:
+					std::mutex mtx;
+					std::condition_variable_any cv;
+
+					bool has_jobs = false;
+					bool done = false;
+
+					auto get_status() noexcept{ return [this](){return has_jobs || done;};}
+					void reset_status() noexcept{ has_jobs = false; }
+			} status{};
+
+			//void (*jobs)();//pimpl
+			//
+			std::string cmd{};
+			int system_ret{};
+
+			void jobs(){
+				system_ret = std::system(cmd.c_str());
+			}
+
+		public:
+			void worker_func(std::stop_token stoken){
+				std::unique_lock<std::mutex> lock{status.mtx};
+
+				while(true){
+					status.cv.wait(lock,stoken,status.get_status());
+
+					//quit
+					if(stoken.stop_requested())break;
+					if (status.done)break;
+
+					jobs();
+
+					status.reset_status();//for next waiting
+				}
+			}
+
+			void force_to_wake_up_worker(){
+				std::lock_guard<std::mutex> lock{status.mtx};
+
+				status.has_jobs = true;
+				status.cv.notify_all();
+			}
+
+			void try_to_wake_up_worker(){
+				std::unique_lock<std::mutex> lock(status.mtx,std::try_to_lock_t{});
+
+				if(lock.owns_lock()){
+					status.has_jobs = true;
+					status.cv.notify_one();
+				}
+			}
+
+			//need to wakeup before thread join
+			//manually call or use stop_token
+			void release_worker(){
+				std::lock_guard<std::mutex> lock{status.mtx};
+
+				status.done = true;
+				status.cv.notify_all();
+			}
+
+		public:
+			~cmd_worker()=default;
+	};
+
 	enum page_status{
 		PAGE_IO,
 		PAGE_STYLE,
@@ -335,6 +473,7 @@ namespace core{
 		PAGE_SDL_HINTS,
 		PAGE_SDL_MICS,
 		PAGE_HIT_TEST,
+		PAGE_CMD,
 	};
 
 	struct sdl_event_ctx{
@@ -356,7 +495,7 @@ namespace core{
 		float leftw_pct = 0.2f;
 		float bottomh_pct = 0.039f;
 
-		page_status page = PAGE_HIT_TEST;
+		page_status page = PAGE_CMD;
 		bool window_draggable = false;
 
 		//kbd
@@ -374,6 +513,12 @@ namespace core{
 					va_end(args);
 				}
 		}e_tbuf;
+
+		//cmd
+		cmd_worker cworker_ctl{};
+		std::jthread cworker{[this](std::stop_token stoken){
+			(*this).cworker_ctl.worker_func(stoken);
+		}};
 
 		//audio
 		core::realtime_audio realtime_audio{};

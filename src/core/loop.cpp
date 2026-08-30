@@ -64,6 +64,7 @@ void page_sdl_event_content(core::sdl_event_ctx &ctx);
 void page_sdl_hints_content(core::sdl_event_ctx &ctx);
 void page_sdl_mics_content(core::sdl_event_ctx &ctx);
 void page_sdl_hit_test_content(core::sdl_event_ctx &ctx);
+void page_cmd_content(core::sdl_event_ctx &ctx);
 
 void DrawCountCard(
 		int64_t count,
@@ -290,6 +291,7 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 			add_button("SDL_HINTS", core::PAGE_SDL_HINTS);
 			add_button("SDL_MICS", core::PAGE_SDL_MICS);
 			add_button("Hit Test", core::PAGE_HIT_TEST);
+			add_button("command", core::PAGE_CMD);
 		}
 		ImGui::EndChild();
 
@@ -314,12 +316,18 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 					}
 
 					//window size
-					const char* items[] = { "1024x1024", "1920x1080"};
-					static int current_item = 0;
+					const char* items[] = {"256x256","512x512", "1024x1024", "1920x1080"};
+					static int current_item = 2;
 
 					if (ImGui::Combo("window size", &current_item, items, IM_ARRAYSIZE(items))) {
 						if (std::strcmp(items[current_item],"1024x1024") == 0){
 							SDL_SetWindowSize(ctx.swm.window,1024,1024);
+						}
+						else if (std::strcmp(items[current_item],"256x256") == 0){
+							SDL_SetWindowSize(ctx.swm.window,256,256);
+						}
+						else if (std::strcmp(items[current_item],"512x512") == 0){
+							SDL_SetWindowSize(ctx.swm.window,512,512);
 						}
 						else if (std::strcmp(items[current_item],"1920x1080") == 0){
 							SDL_SetWindowSize(ctx.swm.window,1920,1080);
@@ -359,6 +367,11 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 
 				case core::PAGE_HIT_TEST:{
 					page_sdl_hit_test_content(ctx);
+					break;
+				}
+
+				case core::PAGE_CMD:{
+					page_cmd_content(ctx);
 					break;
 				}
 
@@ -1693,6 +1706,88 @@ void page_sdl_hit_test_content(core::sdl_event_ctx &ctx){
 
 	}
 
+}
+
+void page_cmd_content(core::sdl_event_ctx &ctx){
+	//time control
+	std::chrono::steady_clock::time_point tp_now = std::chrono::steady_clock::now();
+	static std::chrono::steady_clock::time_point tp_last{};
+	static int delay = 1000;
+
+	//status control
+	static bool turn_on_off = false;
+
+	//adjust delay values
+	ImGui::DragInt("delay_ms",&delay);
+
+	static std::string command;
+	if(command.capacity() < 1024){
+		command.reserve(1024);
+	}
+
+	//resize for input multiline
+	auto resize_callback = [](ImGuiInputTextCallbackData* data) -> int {
+		if(!data) return 0;
+
+		if ((*data).EventFlag == ImGuiInputTextFlags_CallbackResize) {
+			auto* str = (std::string*)(*data).UserData;
+			(*str).resize((*data).BufSize);
+			(*data).Buf = (*str).data();
+		}
+
+
+		return 0;
+	};
+
+	//preset command
+	static int cur_item = 0;
+	static std::vector<std::string> preset_commands = {
+		"ydotool key 29:1 47:1 47:0 29:0 28:1 28:0 #ctrl+v enter",
+		"ydotool key 29:1 47:1 47:0 29:0 42:1 28:1 28:0 42:0 #ctrl+v shift+enter",
+		"ydotool type adadadadad -d 5",
+		"ydotool type wswswswsws -d 5",
+	};
+
+	if(ImGui::BeginCombo("select", command.c_str())){
+		for(size_t i=0;i<preset_commands.size();i++){
+			ImGui::PushID(i);
+			if(ImGui::Selectable(preset_commands[i].c_str())){
+				command = preset_commands[i];
+			}
+			ImGui::PopID();
+		}
+
+		ImGui::EndCombo();
+	}
+
+
+	//input command
+	ImGui::InputTextMultiline("command",
+			command.data(), command.capacity(),
+			ImVec2(0,0),
+			ImGuiInputTextFlags_CallbackResize, resize_callback,
+			&command);
+
+	//update command
+	if(!turn_on_off){//write lock
+		std::lock_guard<std::mutex> write_lock(ctx.cworker_ctl.status.mtx);
+		ctx.cworker_ctl.cmd.assign(command.data(), command.size());
+	}
+
+	//run command
+	if (turn_on_off && tp_last + std::chrono::milliseconds(delay) < tp_now){
+		tp_last = tp_now;
+
+		//try to weak up
+		ctx.cworker_ctl.try_to_wake_up_worker();
+		std::this_thread::yield();
+	}
+
+	//turn on/off
+	(void)ImGui::Toggle("turn on/off",&turn_on_off);
+
+	//return value
+	ImGui::Text("system_ret: %d",ctx.cworker_ctl.system_ret);
 }
 
 void ColorfulStyle(){

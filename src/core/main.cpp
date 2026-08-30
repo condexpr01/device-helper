@@ -24,6 +24,8 @@ void app(int argc, char **argv){
 	core::sdl_event_manager sem{swm,sgcm,sgicm};
 	core::set_up_sdl_event_ctx_datas(argc,argv,sem.get_ctx());
 
+	core::sdl_tray_manager stm{swm.window};
+
 	SDL_SetWindowHitTest(sem.get_ctx().swm.window,
 		[](SDL_Window *window, const SDL_Point *area, void *data) -> SDL_HitTestResult{
 			if (data && *static_cast<bool*>(data)){
