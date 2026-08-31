@@ -263,6 +263,12 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 			cra = ImGui::GetContentRegionAvail();
 			ImVec2 button_size = ImVec2{cra.x , cra.y/20.f};
 
+			//drag window
+			if(ImGui::Button("drag window",button_size)){
+				ctx.window_draggable = true;
+			}
+
+			//add button func
 			auto add_button = [&ctx,&button_size](const char *name, core::page_status page){
 				bool pop = false;
 				ImU32 color_selected = IM_COL32(0x39,0xc5,0xbb,0xff);
@@ -282,6 +288,7 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 					pop = false;
 				}
 			};
+
 
 			add_button("IO", core::PAGE_IO);
 			add_button("Style", core::PAGE_STYLE);
@@ -309,11 +316,6 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 				case core::PAGE_STYLE:{
 
 					ImGui::SeparatorText("window");
-
-					//drag window
-					if(ImGui::Button("Click to drag window position")){
-						ctx.window_draggable = true;
-					}
 
 					//window size
 					const char* items[] = {"256x256","512x512", "1024x1024", "1920x1080"};
@@ -382,6 +384,7 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 
 		//bottom status bar
 		if(ImGui::BeginChild("bottom",bottom_size,ImGuiChildFlags_Borders)){
+			//version
 			ImGui::Text("imgui version: %s",ImGui::GetVersion());
 		}
 		ImGui::EndChild();
@@ -1556,67 +1559,6 @@ void page_sdl_mics_content(core::sdl_event_ctx &ctx){
 }
 
 
-void DrawCountCard(
-		int64_t count,
-		std::string title,
-		std::string num_suffix,
-		std::string label,
-		ImVec2 size,
-		float rounding,
-		float title_font_size,
-		float num_font_size,
-		float label_font_size
-		){
-
-
-	auto anime_color = [](ImU32 startColor, float speed = 0.08f) -> ImU32 {
-		ImVec4 rgba = ImGui::ColorConvertU32ToFloat4(startColor);
-
-		float h{}, s{}, v{};
-		ImGui::ColorConvertRGBtoHSV(rgba.x, rgba.y, rgba.z, h, s, v);
-
-		float time = ImGui::GetTime() * speed;
-		h = fmodf(h + time, 1.0f);
-
-		ImVec4 ret_rgba;
-		ImGui::ColorConvertHSVtoRGB(h, s, v, ret_rgba.x, ret_rgba.y, ret_rgba.z);
-		ret_rgba.w = rgba.w;
-
-		return ImGui::ColorConvertFloat4ToU32(ret_rgba);
-	};
-
-	ImDrawList* draw = ImGui::GetWindowDrawList();
-	ImVec2 card_pos = ImGui::GetCursorScreenPos();
-	//ImVec2 card_size = ImGui::GetContentRegionAvail();
-	ImVec2 card_size = size;
-
-	ImU32 col_bg = anime_color(IM_COL32(0x39, 0xc5, 0xbb, 0xff));
-	ImU32 col_tx = anime_color(IM_COL32(0xf5, 0xf5, 0xf5, 0xf5));
-
-	//bg and shadow and border
-	ImVec2 bg_pos_max = ImVec2(card_pos.x + card_size.x, card_pos.y + card_size.y);
-	draw->AddRectFilled(card_pos, bg_pos_max , col_bg, rounding);
-	draw->AddRect(card_pos, bg_pos_max , col_tx, rounding);
-	draw->AddRectFilled(card_pos, bg_pos_max , IM_COL32(0, 0, 0, 0x32), rounding);
-
-	ImVec2 title_pos = ImVec2(card_pos.x + 0.1*card_size.x, card_pos.y + 0.1*card_size.y);
-	(*draw).AddText(ImGui::GetFont(), title_font_size, title_pos, col_tx, title.c_str());
-
-	std::string buf = std::to_string(count);
-	buf += num_suffix;
-	ImVec2 num_pos = ImVec2(card_pos.x  + 0.2*card_size.x, card_pos.y + 0.5*card_size.y);
-	(*draw).AddText(ImGui::GetFont(), num_font_size, num_pos, col_tx , buf.c_str());
-
-	ImVec2 line_pos_min = ImVec2(card_pos.x  + 0.2*card_size.x, card_pos.y + 0.8*card_size.y);
-	ImVec2 line_pos_max = ImVec2(line_pos_min.x + 0.7 *card_size.x,line_pos_min.y + 0.01*card_size.y);
-	(*draw).AddRect(line_pos_min, line_pos_max, col_tx, rounding);
-
-	ImVec2 label_pos = ImVec2(card_pos.x  + 0.25*card_size.x, card_pos.y + 0.86*card_size.y);
-	(*draw).AddText(ImGui::GetFont(), label_font_size, label_pos, col_tx, label.c_str());
-
-	ImGui::Dummy(size);
-}
-
 void page_sdl_hit_test_content(core::sdl_event_ctx &ctx){
 
 	static bool start = false;
@@ -1788,6 +1730,67 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 
 	//return value
 	ImGui::Text("system_ret: %d",ctx.cworker_ctl.system_ret);
+}
+
+void DrawCountCard(
+		int64_t count,
+		std::string title,
+		std::string num_suffix,
+		std::string label,
+		ImVec2 size,
+		float rounding,
+		float title_font_size,
+		float num_font_size,
+		float label_font_size
+		){
+
+
+	auto anime_color = [](ImU32 startColor, float speed = 0.08f) -> ImU32 {
+		ImVec4 rgba = ImGui::ColorConvertU32ToFloat4(startColor);
+
+		float h{}, s{}, v{};
+		ImGui::ColorConvertRGBtoHSV(rgba.x, rgba.y, rgba.z, h, s, v);
+
+		float time = ImGui::GetTime() * speed;
+		h = fmodf(h + time, 1.0f);
+
+		ImVec4 ret_rgba;
+		ImGui::ColorConvertHSVtoRGB(h, s, v, ret_rgba.x, ret_rgba.y, ret_rgba.z);
+		ret_rgba.w = rgba.w;
+
+		return ImGui::ColorConvertFloat4ToU32(ret_rgba);
+	};
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	ImVec2 card_pos = ImGui::GetCursorScreenPos();
+	//ImVec2 card_size = ImGui::GetContentRegionAvail();
+	ImVec2 card_size = size;
+
+	ImU32 col_bg = anime_color(IM_COL32(0x39, 0xc5, 0xbb, 0xff));
+	ImU32 col_tx = anime_color(IM_COL32(0xf5, 0xf5, 0xf5, 0xf5));
+
+	//bg and shadow and border
+	ImVec2 bg_pos_max = ImVec2(card_pos.x + card_size.x, card_pos.y + card_size.y);
+	draw->AddRectFilled(card_pos, bg_pos_max , col_bg, rounding);
+	draw->AddRect(card_pos, bg_pos_max , col_tx, rounding);
+	draw->AddRectFilled(card_pos, bg_pos_max , IM_COL32(0, 0, 0, 0x32), rounding);
+
+	ImVec2 title_pos = ImVec2(card_pos.x + 0.1*card_size.x, card_pos.y + 0.1*card_size.y);
+	(*draw).AddText(ImGui::GetFont(), title_font_size, title_pos, col_tx, title.c_str());
+
+	std::string buf = std::to_string(count);
+	buf += num_suffix;
+	ImVec2 num_pos = ImVec2(card_pos.x  + 0.2*card_size.x, card_pos.y + 0.5*card_size.y);
+	(*draw).AddText(ImGui::GetFont(), num_font_size, num_pos, col_tx , buf.c_str());
+
+	ImVec2 line_pos_min = ImVec2(card_pos.x  + 0.2*card_size.x, card_pos.y + 0.8*card_size.y);
+	ImVec2 line_pos_max = ImVec2(line_pos_min.x + 0.7 *card_size.x,line_pos_min.y + 0.01*card_size.y);
+	(*draw).AddRect(line_pos_min, line_pos_max, col_tx, rounding);
+
+	ImVec2 label_pos = ImVec2(card_pos.x  + 0.25*card_size.x, card_pos.y + 0.86*card_size.y);
+	(*draw).AddText(ImGui::GetFont(), label_font_size, label_pos, col_tx, label.c_str());
+
+	ImGui::Dummy(size);
 }
 
 void ColorfulStyle(){
