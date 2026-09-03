@@ -1678,7 +1678,7 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	}
 
 	//wheather or not to update clipboard to next line
-	static bool update_clipboard = true;
+	static bool update_clipboard = false;
 	static size_t clipboard_line_index=0;
 
 	//resize for input multiline
