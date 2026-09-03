@@ -1659,13 +1659,27 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	//status control
 	static bool turn_on_off = false;
 
+	ImGui::SeparatorText("run command");
+
 	//adjust delay values
 	ImGui::DragInt("delay_ms",&delay);
+	if(delay < 0)delay = 0;
 
+	//cmd text
 	static std::string command;
 	if(command.capacity() < 1024){
 		command.reserve(1024);
 	}
+
+	//clipboard textline
+	static std::string clipboard_textline;
+	if(clipboard_textline.capacity() < 1024){
+		clipboard_textline.reserve(1024);
+	}
+
+	//wheather or not to update clipboard to next line
+	static bool update_clipboard = true;
+	static size_t clipboard_line_index=0;
 
 	//resize for input multiline
 	auto resize_callback = [](ImGuiInputTextCallbackData* data) -> int {
@@ -1681,13 +1695,22 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 		return 0;
 	};
 
+	//avail
+	ImVec2 avail = ImGui::GetContentRegionAvail();
+
 	//preset command
 	static int cur_item = 0;
 	static std::vector<std::string> preset_commands = {
+		"xdotool key --window id ctrl+v enter",
+		"xdotool key --window id ctrl+v shift+enter",
+		"xdotool key --window id ctrl+shift+v enter",
+
 		"ydotool key 29:1 47:1 47:0 29:0 28:1 28:0 #ctrl+v enter",
 		"ydotool key 29:1 47:1 47:0 29:0 42:1 28:1 28:0 42:0 #ctrl+v shift+enter",
-		"ydotool type adadadadad -d 5",
-		"ydotool type wswswswsws -d 5",
+		"ydotool key 29:1 42:1 47:1 47:0 42:0 29:0 28:1 28:0 #ctrl+shift+v enter",
+
+		"xdotool type --window id adadadadad",
+		"xdotool type --window id wswswswsws",
 	};
 
 	if(ImGui::BeginCombo("select", command.c_str())){
@@ -1704,10 +1727,11 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 
 
 	//input command
-	ImGui::InputTextMultiline("command",
+	ImGui::InputTextMultiline("##command",
 			command.data(), command.capacity(),
-			ImVec2(0,0),
-			ImGuiInputTextFlags_CallbackResize, resize_callback,
+			ImVec2(avail.x,0.4f * avail.y),
+			ImGuiInputTextFlags_CallbackResize,
+			resize_callback,
 			&command);
 
 	//update command
@@ -1720,6 +1744,37 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	if (turn_on_off && tp_last + std::chrono::milliseconds(delay) < tp_now){
 		tp_last = tp_now;
 
+		//update_clipboard
+		if(update_clipboard){
+			clipboard_line_index++;
+			if(clipboard_line_index > std::count(clipboard_textline.begin(),clipboard_textline.end(),'\n')){
+				clipboard_line_index = 0;
+			}
+
+			size_t l=0,r=0;
+			for(size_t line = 0;l < clipboard_textline.size();l++){
+				if(line == clipboard_line_index)break;
+				else if(clipboard_textline[l] == '\n')line++;
+			}
+
+			for(r=l; r+1 < clipboard_textline.size();){
+				r++;
+				if(clipboard_textline[r] == '\n')break;
+			}
+
+			ImGui::SetClipboardText(clipboard_textline.substr(l,r-l).c_str());
+
+			#if 0
+			std::istringstream ss(clipboard_textline);
+			std::string textline;
+			for (int i = 0; i <= clipboard_line_index && std::getline(ss, textline); ++i) {
+				if (i == clipboard_line_index){
+					ImGui::SetClipboardText(textline.c_str());
+				}
+			}
+			#endif
+		}
+
 		//try to weak up
 		ctx.cworker_ctl.try_to_wake_up_worker();
 		std::this_thread::yield();
@@ -1730,6 +1785,25 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 
 	//return value
 	ImGui::Text("system_ret: %d",ctx.cworker_ctl.system_ret);
+
+
+	//input textline for clipboard
+	ImGui::SeparatorText("update clipboard to next textline");
+
+	if(ImGui::Button("clear clipboard textline")){
+		clipboard_textline.clear();
+	}
+
+	ImGui::SameLine();
+	(void)ImGui::Toggle("update clipboard", &update_clipboard);
+
+	ImGui::InputTextMultiline("##clipboard_textline",
+			clipboard_textline.data(), clipboard_textline.capacity(),
+			ImVec2(avail.x,0.4f * avail.y),
+			ImGuiInputTextFlags_CallbackResize,
+			resize_callback,
+			&clipboard_textline);
+
 }
 
 void DrawCountCard(
