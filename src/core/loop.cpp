@@ -1781,7 +1781,7 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	}
 
 	//turn on/off
-	(void)ImGui::Toggle("turn on/off",&turn_on_off);
+	(void)ImGui::Toggle("turn on/off",&turn_on_off, ImVec2{100,50});
 
 	//return value
 	ImGui::Text("system_ret: %d",ctx.cworker_ctl.system_ret);
