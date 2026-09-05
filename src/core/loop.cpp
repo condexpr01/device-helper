@@ -444,7 +444,7 @@ void frame::render_frame(core::sdl_event_ctx &ctx){
 		if(!SDL_GL_SwapWindow(ctx.swm.window)){
 			ctx.running = false;
 			ctx.status = false;
-			ctx.reason = "[prepare::render_frame]SDL_GL_SwapWindow";
+			ctx.reason = "[frame::render_frame]SDL_GL_SwapWindow";
 			return;
 		}
 
