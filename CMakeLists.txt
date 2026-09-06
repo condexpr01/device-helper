@@ -69,23 +69,23 @@ target_sources(${PROJECT_NAME}
 	PRIVATE src/imgui/imgui_impl_opengl3.cpp
 	PRIVATE src/imgui/imgui_impl_sdl3.cpp
 
-	PRIVATE src/imgui/implot.cpp
-	PRIVATE src/imgui/implot_demo.cpp
-	PRIVATE src/imgui/implot_items.cpp
+	#PRIVATE src/imgui/implot.cpp
+	#PRIVATE src/imgui/implot_demo.cpp
+	#PRIVATE src/imgui/implot_items.cpp
 
 	#PRIVATE src/imgui/imgui_md.cpp
 
-	PRIVATE src/imgui/implot3d.cpp
-	PRIVATE src/imgui/implot3d_demo.cpp
-	PRIVATE src/imgui/implot3d_items.cpp
-	PRIVATE src/imgui/implot3d_meshes.cpp
+	#PRIVATE src/imgui/implot3d.cpp
+	#PRIVATE src/imgui/implot3d_demo.cpp
+	#PRIVATE src/imgui/implot3d_items.cpp
+	#PRIVATE src/imgui/implot3d_meshes.cpp
 
 	PRIVATE src/imgui/imgui_toggle.cpp
 	PRIVATE src/imgui/imgui_toggle_palette.cpp
 	PRIVATE src/imgui/imgui_toggle_presets.cpp
 	PRIVATE src/imgui/imgui_toggle_renderer.cpp
 
-	PRIVATE src/imgui/imnodes.cpp
+	#PRIVATE src/imgui/imnodes.cpp
 
 	PRIVATE src/glad/gl.cpp
 
@@ -125,14 +125,20 @@ if(NOT SDL3_FOUND)
 	FetchContent_Declare(SDL3
 		GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
 		#GIT_REPOSITORY git@github.com:libsdl-org/SDL.git
-		GIT_TAG release-3.4.14)
+		#GIT_REPOSITORY file:///home/condexpr01/Desktop/fakerepos/clone/SDL/.git
+		GIT_TAG release-3.4.8
+		)
+
 	FetchContent_MakeAvailable(SDL3)
 endif()
 
 # sdl related
 if(WIN32)
 	if(MSVC)
-		target_link_options(${PROJECT_NAME} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
+		target_link_options(
+			${PROJECT_NAME} 
+			PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
+		)
 	else()
 		target_link_options(${PROJECT_NAME} PRIVATE -static -mwindows)
 	endif()
@@ -149,8 +155,11 @@ if(NOT glm_FOUND)
 	FetchContent_Declare(glm
 		GIT_REPOSITORY https://github.com/g-truc/glm.git
 		#GIT_REPOSITORY git@github.com:g-truc/glm.git
-		GIT_TAG 1.0.3)
+		#GIT_REPOSITORY file:///home/condexpr01/Desktop/fakerepos/clone/glm/.git
+		GIT_TAG 1.0.3
+		)
 	FetchContent_MakeAvailable(glm)
+	target_include_directories(${PROJECT_NAME} PRIVATE ${glm_SOURCE_DIR})
 endif()
 
 # check variables in the end

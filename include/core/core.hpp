@@ -7,9 +7,9 @@
 #include "imgui_internal.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
-#include "implot.h"
-#include "implot3d.h"
-#include "imnodes.h"
+//#include "implot.h"
+//#include "implot3d.h"
+//#include "imnodes.h"
 #include "imgui_toggle.h"
 
 #include <SDL3/SDL.h>
@@ -154,9 +154,9 @@ namespace core{
 		//res
 		public:
 			ImGuiContext *imgui_ctx = nullptr;
-			ImPlotContext *implot_ctx = nullptr;
-			ImPlot3DContext *implot3d_ctx = nullptr;
-			ImNodesContext *imnodes_ctx = nullptr;
+			//ImPlotContext *implot_ctx = nullptr;
+			//ImPlot3DContext *implot3d_ctx = nullptr;
+			//ImNodesContext *imnodes_ctx = nullptr;
 
 			ImFont* font = nullptr;
 			const float fontsize = 18.f;
@@ -165,14 +165,14 @@ namespace core{
 		public:
 			sdl3_gl3_imgui_ctx_manager(SDL_Window *glwindow,SDL_GLContext glctx) noexcept{
 				imgui_ctx = ImGui::CreateContext();
-				implot_ctx = ImPlot::CreateContext();
-				implot3d_ctx = ImPlot3D::CreateContext();
-				imnodes_ctx = ImNodes::CreateContext();
+				//implot_ctx = ImPlot::CreateContext();
+				//implot3d_ctx = ImPlot3D::CreateContext();
+				//imnodes_ctx = ImNodes::CreateContext();
 
 				if (!imgui_ctx 
-						|| !implot_ctx 
-						|| !implot3d_ctx 
-						|| !imnodes_ctx
+						//|| !implot_ctx 
+						//|| !implot3d_ctx 
+						//|| !imnodes_ctx
 				   ){
 					status = false;
 					reason = "[sdl_gl_imgui_ctx_manager]CreateContext";
@@ -231,9 +231,9 @@ namespace core{
 				ImGui_ImplSDL3_Shutdown();
 				ImGui_ImplOpenGL3_Shutdown();
 				ImGui::DestroyContext(imgui_ctx);
-				ImPlot::DestroyContext(implot_ctx);
-				ImPlot3D::DestroyContext(implot3d_ctx);
-				ImNodes::DestroyContext(imnodes_ctx);
+				//ImPlot::DestroyContext(implot_ctx);
+				//ImPlot3D::DestroyContext(implot3d_ctx);
+				//ImNodes::DestroyContext(imnodes_ctx);
 			}
 
 			//neither movable nor copyable
