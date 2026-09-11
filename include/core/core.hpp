@@ -7,6 +7,7 @@
 #include "imgui_internal.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
+#include "imgui_stdlib.h"
 //#include "implot.h"
 //#include "implot3d.h"
 //#include "imnodes.h"
@@ -23,6 +24,14 @@
 
 #include <mutex>
 #include <thread>
+
+#include <pcap/pcap.h>
+
+#ifdef __linux__
+#include <linux/if_packet.h>
+#endif
+
+#include "pcap-ext/pcap-ext.hpp"
 
 #include <vector>
 
@@ -422,9 +431,9 @@ namespace core{
 
 		public:
 			void worker_func(std::stop_token stoken){
-				std::unique_lock<std::mutex> lock{status.mtx};
-
 				while(true){
+					std::unique_lock<std::mutex> lock{status.mtx};
+
 					status.cv.wait(lock,stoken,status.get_status());
 
 					//quit
@@ -438,9 +447,11 @@ namespace core{
 			}
 
 			void force_to_wake_up_worker(){
-				std::lock_guard<std::mutex> lock{status.mtx};
+				std::unique_lock<std::mutex> lock(status.mtx);
 
 				status.has_jobs = true;
+
+				lock.unlock();
 				status.cv.notify_all();
 			}
 
@@ -449,6 +460,8 @@ namespace core{
 
 				if(lock.owns_lock()){
 					status.has_jobs = true;
+
+					lock.unlock();
 					status.cv.notify_one();
 				}
 			}
@@ -456,9 +469,11 @@ namespace core{
 			//need to wakeup before thread join
 			//manually call or use stop_token
 			void release_worker(){
-				std::lock_guard<std::mutex> lock{status.mtx};
+				std::unique_lock<std::mutex> lock(status.mtx);
 
 				status.done = true;
+
+				lock.unlock();
 				status.cv.notify_all();
 			}
 
@@ -476,65 +491,83 @@ namespace core{
 		PAGE_SDL_MICS,
 		PAGE_HIT_TEST,
 		PAGE_CMD,
+		PAGE_PCAP,
 	};
 
 	struct sdl_event_ctx{
 		//error status
-		bool status = false;
-		const char* reason = nullptr;
+		public:
+			bool status = false;
+			const char* reason = nullptr;
 
-		//ctx vars
-		SDL_Event e;
-		bool running = false;
+		public:
+			//ctx vars
+			SDL_Event e;
+			bool running = false;
 
-		//ctx managers
-		sdl_window_manager &swm;
-		sdl_gl_ctx_manager &sgcm;
-		sdl3_gl3_imgui_ctx_manager &sgicm;
+			//ctx managers
+			sdl_window_manager &swm;
+			sdl_gl_ctx_manager &sgcm;
+			sdl3_gl3_imgui_ctx_manager &sgicm;
 
-		//datas
-		std::filesystem::path png_path;
-		float leftw_pct = 0.2f;
-		float bottomh_pct = 0.039f;
+			//datas
+			std::filesystem::path png_path;
+			float leftw_pct = 0.2f;
+			float bottomh_pct = 0.039f;
 
-		page_status page = PAGE_CMD;
-		bool window_draggable = false;
+			page_status page = PAGE_PCAP;
+			bool window_draggable = false;
 
-		//kbd
-		core::keyboard keyboard{};
+			//kbd
+			core::keyboard keyboard{};
 
-		//recording events
-		class txtbuf{
-			public:
-				ImGuiTextBuffer txtbuf;
-				void operator()(const char* fmt, ...){
-					va_list args;
-					va_start(args, fmt);
-					txtbuf.appendfv(fmt, args);
-					txtbuf.appendf("\n");
-					va_end(args);
-				}
-		}e_tbuf;
+			//recording events
+			class txtbuf{
+				public:
+					ImGuiTextBuffer txtbuf;
+					void operator()(const char* fmt, ...){
+						va_list args;
+						va_start(args, fmt);
+						txtbuf.appendfv(fmt, args);
+						txtbuf.appendf("\n");
+						va_end(args);
+					}
+			}e_tbuf;
 
-		//cmd
-		cmd_worker cworker_ctl{};
-		std::jthread cworker{[this](std::stop_token stoken){
-			(*this).cworker_ctl.worker_func(stoken);
-		}};
+			//cmd
+			cmd_worker cworker_ctl{};
+			std::jthread cworker{[this](std::stop_token stoken){
+				(*this).cworker_ctl.worker_func(stoken);
+			}};
 
-		//audio
-		core::realtime_audio realtime_audio{};
-		core::callback_on_time_audio callback_on_time_audio{};
-		core::recording_audio recording_audio{};
+			//audio
+			core::realtime_audio realtime_audio{};
+			core::callback_on_time_audio callback_on_time_audio{};
+			core::recording_audio recording_audio{};
 
-		//capture
-		core::texture frame_tex{GL_TEXTURE_2D};
-		core::capture_device capture_device{};
+			//capture
+			core::texture frame_tex{GL_TEXTURE_2D};
+			core::capture_device capture_device{};
 
-		//MVP
-		//glm::mat4 model{1.f};
-		//core::camera camera{};
-		//glm::mat4 projection{1.f};
+			//pcap
+			core::pcap_ext_init pcap_ext_init_manager;
+			core::pcap_ext_alldevs pcap_alldevs_manager;
+			core::pcap_ext_stats pcap_ext_stats;
+
+			pcap_recv_worker pworker_recv_ctl{};
+			std::jthread pworker{[this](std::stop_token stoken){
+				(*this).pworker_recv_ctl.worker_func(stoken);
+			}};
+
+			pcap_send_worker pworker_send_ctl{};
+			std::jthread pworker_sending{[this](std::stop_token stoken){
+				(*this).pworker_send_ctl.worker_func(stoken);
+			}};
+
+			//MVP
+			//glm::mat4 model{1.f};
+			//core::camera camera{};
+			//glm::mat4 projection{1.f};
 
 	};
 

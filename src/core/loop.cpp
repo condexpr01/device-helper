@@ -65,6 +65,7 @@ void page_sdl_hints_content(core::sdl_event_ctx &ctx);
 void page_sdl_mics_content(core::sdl_event_ctx &ctx);
 void page_sdl_hit_test_content(core::sdl_event_ctx &ctx);
 void page_cmd_content(core::sdl_event_ctx &ctx);
+void page_pcap_content(core::sdl_event_ctx &ctx);
 
 void DrawCountCard(
 		int64_t count,
@@ -299,6 +300,7 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 			add_button("SDL_MICS", core::PAGE_SDL_MICS);
 			add_button("Hit Test", core::PAGE_HIT_TEST);
 			add_button("command", core::PAGE_CMD);
+			add_button("PCAP", core::PAGE_PCAP);
 		}
 		ImGui::EndChild();
 
@@ -374,6 +376,11 @@ void frame::imgui_window(core::sdl_event_ctx &ctx){
 
 				case core::PAGE_CMD:{
 					page_cmd_content(ctx);
+					break;
+				}
+
+				case core::PAGE_PCAP:{
+					page_pcap_content(ctx);
 					break;
 				}
 
@@ -462,18 +469,6 @@ void frame::render_frame(core::sdl_event_ctx &ctx){
 
 }
 
-//call top in loop
-void core::sdl_event_manager::loop() {
-	prepare prepare;
-	frame frame;
-
-	prepare.all(ctx);
-
-	while(ctx.running && ctx.status){
-		frame.one_frame(ctx);
-	}
-
-}
 
 void page_io_content(){
 	ImGuiIO &io = ImGui::GetIO();
@@ -1088,7 +1083,7 @@ void page_style_content(){
 	}
 
 
-	ImGui::InputTextMultiline("##copyable text",s.data(),s.size(),
+	ImGui::InputTextMultiline("##copyable text",&s,
 			ImVec2{ImGui::GetContentRegionAvail().x,ImGui::GetTextLineHeight() * 128},
 			ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_WordWrap);
 }
@@ -1667,9 +1662,6 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 
 	//cmd text
 	static std::string command;
-	if(command.capacity() < 1024){
-		command.reserve(1024);
-	}
 
 	//clipboard textline
 	static std::string clipboard_textline;
@@ -1682,19 +1674,6 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	static size_t clipboard_line_index=0;
 
 	//resize for input multiline
-	auto resize_callback = [](ImGuiInputTextCallbackData* data) -> int {
-		if(!data) return 0;
-
-		if ((*data).EventFlag == ImGuiInputTextFlags_CallbackResize) {
-			auto* str = (std::string*)(*data).UserData;
-			(*str).resize((*data).BufSize);
-			(*data).Buf = (*str).data();
-		}
-
-
-		return 0;
-	};
-
 	//avail
 	ImVec2 avail = ImGui::GetContentRegionAvail();
 
@@ -1727,12 +1706,7 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 
 
 	//input command
-	ImGui::InputTextMultiline("##command",
-			command.data(), command.capacity(),
-			ImVec2(avail.x,0.4f * avail.y),
-			ImGuiInputTextFlags_CallbackResize,
-			resize_callback,
-			&command);
+	ImGui::InputTextMultiline("##command input", &command, ImVec2(avail.x,0.4f * avail.y));
 
 	//update command
 	if(!turn_on_off){//write lock
@@ -1747,32 +1721,29 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 		//update_clipboard
 		if(update_clipboard){
 			clipboard_line_index++;
+
+			//loop index
 			if(clipboard_line_index > std::count(clipboard_textline.begin(),clipboard_textline.end(),'\n')){
 				clipboard_line_index = 0;
 			}
 
-			size_t l=0,r=0;
+			size_t l=0,r=0;//clip window[l, r]
+
 			for(size_t line = 0;l < clipboard_textline.size();l++){
 				if(line == clipboard_line_index)break;
 				else if(clipboard_textline[l] == '\n')line++;
 			}
 
 			for(r=l; r+1 < clipboard_textline.size();){
-				r++;
-				if(clipboard_textline[r] == '\n')break;
+				if(r++; clipboard_textline[r] == '\n')break;
+			}
+
+			//edge situation
+			if(r < clipboard_textline.size() && clipboard_textline[r] != '\n'){
+				r+=1;
 			}
 
 			ImGui::SetClipboardText(clipboard_textline.substr(l,r-l).c_str());
-
-			#if 0
-			std::istringstream ss(clipboard_textline);
-			std::string textline;
-			for (int i = 0; i <= clipboard_line_index && std::getline(ss, textline); ++i) {
-				if (i == clipboard_line_index){
-					ImGui::SetClipboardText(textline.c_str());
-				}
-			}
-			#endif
 		}
 
 		//try to weak up
@@ -1797,12 +1768,469 @@ void page_cmd_content(core::sdl_event_ctx &ctx){
 	ImGui::SameLine();
 	(void)ImGui::Toggle("update clipboard", &update_clipboard);
 
-	ImGui::InputTextMultiline("##clipboard_textline",
-			clipboard_textline.data(), clipboard_textline.capacity(),
-			ImVec2(avail.x,0.4f * avail.y),
-			ImGuiInputTextFlags_CallbackResize,
-			resize_callback,
-			&clipboard_textline);
+	ImGui::InputTextMultiline("##clipboard_textline", &clipboard_textline, ImVec2(avail.x,0.4f * avail.y));
+
+}
+
+void page_pcap_content(core::sdl_event_ctx &ctx){
+
+	//init
+	ImGui::SeparatorText("init");
+	if(ctx.pcap_ext_init_manager.is_ok()){
+		ImGui::Text("pcap_init success");
+	}else{
+		ImGui::Text("pcap_init failed: %s",ctx.pcap_ext_init_manager.what());
+		return;
+	}
+
+	//devs
+	ImGui::SeparatorText("select dev");
+
+	static pcap_if_t *alldevs = ctx.pcap_alldevs_manager.get_alldevs();
+	static pcap_if_t *cur_dev = alldevs;
+	static std::string cur_dev_name_preview{};
+
+	//find devs
+	if(ImGui::Button("find devs")){
+		ctx.pcap_alldevs_manager.find();
+		alldevs = ctx.pcap_alldevs_manager.get_alldevs();
+		cur_dev = alldevs;
+		cur_dev_name_preview.clear();
+	}
+	ImGui::SameLine();
+
+	//select dev
+	if(ctx.pcap_alldevs_manager.is_ok()){
+		if(ImGui::BeginCombo("devs", cur_dev_name_preview.c_str())){
+			for(pcap_if_t *iter = alldevs;iter;iter=(*iter).next){
+				if(ImGui::Selectable((*iter).name)){
+					cur_dev_name_preview= (*iter).name;
+					cur_dev = iter;
+				}
+				ImGui::SameLine();
+				ImGui::Text("desc: %s",(*iter).description);
+			}
+
+			ImGui::EndCombo();
+		}
+	}else{
+		ImGui::Text("pcap_findalldevs failed: %s", ctx.pcap_alldevs_manager.what());
+		return;
+	}
+
+	//show sockaddr family string
+	auto show_sa_family = [](const struct sockaddr *saddr)->void{
+		if(!saddr){
+			ImGui::TextWrapped("Invalid");
+			return;
+		}
+
+		ImGui::TextWrapped("%s",core::get_name_pcap_af((*saddr).sa_family));
+	};
+
+	//show sockaddr
+	auto show_sockaddr = [](const struct sockaddr *saddr)->void{
+		if(!saddr){
+			ImGui::TextWrapped("Invalid");
+			return;
+		}
+
+		char ntop_buf[INET6_ADDRSTRLEN];
+
+		switch((*saddr).sa_family){
+			case AF_INET:{
+				sockaddr_in *sin4=(sockaddr_in*)saddr;
+				inet_ntop((*saddr).sa_family, &(*sin4).sin_addr, ntop_buf, INET6_ADDRSTRLEN);
+				ImGui::TextWrapped("%s:%d",ntop_buf , ntohs((*sin4).sin_port));
+				break;
+			}
+
+			case AF_INET6:{
+				sockaddr_in6 *sin6=(sockaddr_in6*)saddr;
+				inet_ntop((*saddr).sa_family, &(*sin6).sin6_addr, ntop_buf, INET6_ADDRSTRLEN);
+				ImGui::TextWrapped("[%s%%%u]:%d [0x%08x]",
+					ntop_buf,
+					(*sin6).sin6_scope_id,
+					ntohs((*sin6).sin6_port),
+					(*sin6).sin6_flowinfo
+				);
+
+				break;
+			}
+
+			#ifdef __linux__
+			case AF_PACKET: {
+				struct sockaddr_ll *sll = (struct sockaddr_ll *)saddr;
+				char mac_str[18] = {0};
+
+				if (sll->sll_halen > 0) {
+					snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+							sll->sll_addr[0], sll->sll_addr[1], sll->sll_addr[2],
+							sll->sll_addr[3], sll->sll_addr[4], sll->sll_addr[5]);
+				} else {
+					strcpy(mac_str, "(none)");
+				}
+
+				ImGui::TextWrapped("MAC: %s", mac_str);
+				ImGui::TextWrapped("ifindex: %d", (*sll).sll_ifindex);
+				ImGui::TextWrapped("hatype: 0x%04x", (*sll).sll_hatype);
+				ImGui::TextWrapped("protocol: 0x%04x", ntohs((*sll).sll_protocol));
+				ImGui::TextWrapped("pkttype: %d", (*sll).sll_pkttype);
+
+				break;
+			}
+			#endif
+
+			default: {
+				 std::string hexdump;
+				 for (int i = 0; i < 14; i++) {
+					 if (i) hexdump += " ";
+					 char buf[3];
+					 snprintf(buf,sizeof(buf),"%02x",static_cast<uint8_t>((*saddr).sa_data[i]));
+					 hexdump += buf;
+				 }
+				 ImGui::TextWrapped("%s", hexdump.c_str());
+				 break;
+			}
+
+		}
+	};
+
+	//cur_dev addr
+	if(ImGui::CollapsingHeader("show cur_dev") && cur_dev){
+		ImGui::Text("flags: %08x desc: %s",(*cur_dev).flags, (*cur_dev).description);
+
+		int id=0;
+		for(pcap_addr_t *iter=(*cur_dev).addresses;iter;iter=(*iter).next){
+			ImGui::PushID(id++);
+			if(ImGui::BeginTable("addrtable",2,ImGuiTableFlags_Borders)){
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("addr");
+				ImGui::SameLine();
+				show_sa_family((*iter).addr);
+				ImGui::TableSetColumnIndex(1);
+				show_sockaddr((*iter).addr);
+
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("netmask");
+				ImGui::SameLine();
+				show_sa_family((*iter).netmask);
+				ImGui::TableSetColumnIndex(1);
+				show_sockaddr((*iter).netmask);
+
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("boadaddr");
+				ImGui::SameLine();
+				show_sa_family((*iter).broadaddr);
+				ImGui::TableSetColumnIndex(1);
+				show_sockaddr((*iter).broadaddr);
+
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("dstaddr");
+				ImGui::SameLine();
+				show_sa_family((*iter).dstaddr);
+				ImGui::TableSetColumnIndex(1);
+				show_sockaddr((*iter).dstaddr);
+
+				ImGui::EndTable();
+			}
+			ImGui::PopID();
+		}
+	}
+
+	//cap dev
+	ImGui::SeparatorText("capture device");
+
+	if(ImGui::Button("create and activate recv handle(selected dev)[sudo/admin required]") && cur_dev){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
+			ctx.pworker_recv_ctl.devname = (*cur_dev).name;
+			ctx.pworker_recv_ctl.hc = core::pcap_recv_worker::HANDLE_CREATE_AND_ACTIVATE;
+		}
+
+		ctx.pworker_recv_ctl.breakloop();
+
+		ctx.pworker_recv_ctl.force_to_wake_up_worker();
+	}
+
+	ImGui::SameLine();
+
+	if(ImGui::Button("recv handle close")){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
+			ctx.pworker_recv_ctl.hc = core::pcap_recv_worker::HANDLE_CLOSE;
+		}
+
+		ctx.pworker_recv_ctl.breakloop();
+
+		ctx.pworker_recv_ctl.force_to_wake_up_worker();
+	}
+
+	{//status check
+		std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
+
+		if(ctx.pworker_recv_ctl.handle.is_ok()){
+			ImGui::Text("(%s)recv handle create success", ctx.pworker_recv_ctl.devname.c_str());
+		}else{
+			ImGui::Text("recv handle status(false) %s", ctx.pworker_recv_ctl.handle.what());
+		}
+
+		if(ctx.pworker_recv_ctl.handle.is_warning()){
+			ImGui::Text("(%s)recv warning: %s",
+					ctx.pworker_recv_ctl.devname.c_str(),
+					ctx.pworker_recv_ctl.handle.what()
+					);
+		}
+	}
+
+	//cap
+	ImGui::SeparatorText("capture status");
+
+	//pkt_vec
+	static std::vector<core::pcap_recv_worker::pkt_element> pkt_vec;
+
+
+	{//fetch data
+		std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
+
+		if(ctx.pworker_recv_ctl.handle.get_handle()){
+			ctx.pcap_ext_stats.update(ctx.pworker_recv_ctl.handle.get_handle());
+		}
+
+		if(!ctx.pworker_recv_ctl.pkt_vec.empty()){
+			pkt_vec.insert(pkt_vec.end(), ctx.pworker_recv_ctl.pkt_vec.begin(), ctx.pworker_recv_ctl.pkt_vec.end());
+			ctx.pworker_recv_ctl.pkt_vec.clear();
+		}
+	}
+
+	//clear button
+	if(ImGui::Button("clear pkg_vec")){
+		pkt_vec.clear();
+	}
+
+
+	struct pcap_stat &ps = ctx.pcap_ext_stats.get_stat();
+	ImGui::Text("recv:%d drop:%d ifdrop%d",ps.ps_recv ,ps.ps_drop, ps.ps_ifdrop);
+
+	//send
+	ImGui::SeparatorText("sending device");
+
+	if(ImGui::Button("create and activate sending handle(selected dev)[sudo/admin required]") && cur_dev){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+			ctx.pworker_send_ctl.devname = (*cur_dev).name;
+			ctx.pworker_send_ctl.hc = core::pcap_send_worker::HANDLE_CREATE_AND_ACTIVATE;
+		}
+
+		ctx.pworker_send_ctl.force_to_wake_up_worker();
+	}
+
+	ImGui::SameLine();
+
+	if(ImGui::Button("close sending dev")){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+			ctx.pworker_send_ctl.hc = core::pcap_send_worker::HANDLE_CLOSE;
+		}
+
+		ctx.pworker_send_ctl.force_to_wake_up_worker();
+	}
+
+	{//status check
+		std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+
+		if(ctx.pworker_send_ctl.handle.is_ok()){
+			ImGui::Text("(%s)send handle create success", ctx.pworker_send_ctl.devname.c_str());
+		}else{
+			ImGui::Text("send handle status(false) %s", ctx.pworker_send_ctl.handle.what());
+		}
+
+		if(ctx.pworker_send_ctl.handle.is_warning()){
+			ImGui::Text("(%s)send handle warning: %s",
+					ctx.pworker_send_ctl.devname.c_str(),
+					ctx.pworker_send_ctl.handle.what()
+					);
+		}
+	}
+
+	ImGui::SeparatorText("send_data");
+
+	static size_t send_index=0;
+
+	static std::vector<u_char> send_data;
+
+	ImGui::InputScalar("data index", ImGuiDataType_U32, &send_index);
+
+	static std::string input_send_data_hex_buf;
+	ImGui::InputTextMultiline("hex data", &input_send_data_hex_buf);
+
+	if(ImGui::Button("load data from index")){
+		if(send_index < pkt_vec.size()){
+			send_data.assign(pkt_vec[send_index].pktdata.begin(),pkt_vec[send_index].pktdata.end());
+		}
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("load data from hex data")){
+		core::hexstr_to_vectoruchar(input_send_data_hex_buf, send_data);
+	}
+
+	if(ImGui::Button("clear send_data")){
+		send_data.clear();
+	}
+
+	if(ImGui::CollapsingHeader("show send_data")){
+		std::string copy_send_data;
+
+		for(int j=0;j < send_data.size();j++){
+			if(j && j%16 != 0){
+				ImGui::SameLine();
+
+				if(j%8 == 0){
+					ImGui::PushID(j);
+					ImGui::Selectable(" ",false,0,{ctx.sgicm.fontsize,0});
+					ImGui::PopID();
+					ImGui::SameLine();
+				}
+			}
+
+			char buf[3];
+			snprintf(buf,3,"%02x",send_data[j]);
+
+			copy_send_data +=buf;
+
+			ImGui::PushID(j);
+			ImGui::Selectable(buf,false,0,{ctx.sgicm.fontsize,0});
+			ImGui::PopID();
+		}
+
+		if(ImGui::Button("copy send data")){
+			ImGui::SetClipboardText(copy_send_data.c_str());
+		}
+	}
+
+	ImGui::SeparatorText("send");
+
+	static bool loop_send = false;
+	ImGui::Toggle("loop send",&loop_send);
+	if(loop_send){
+		bool lock_ok = false;
+
+		{
+			std::unique_lock<std::mutex> lock{ctx.pworker_send_ctl.status.mtx, std::try_to_lock_t{}};
+
+			lock_ok = lock.owns_lock();
+
+			if( lock.owns_lock()
+				&& ctx.pworker_send_ctl.handle.is_ok()
+				&& ctx.pworker_send_ctl.handle.get_handle()){
+
+				ctx.pworker_send_ctl.pkt_vec.push_back(send_data);
+			}
+		}
+
+		if(lock_ok){
+			ctx.pworker_send_ctl.try_to_wake_up_worker();
+		}
+	}
+
+	if(ImGui::Button("send send_data")){
+		{
+			std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+
+			if(ctx.pworker_send_ctl.handle.is_ok() && ctx.pworker_send_ctl.handle.get_handle()){
+				ctx.pworker_send_ctl.pkt_vec.push_back(send_data);
+			}
+		}
+
+		ctx.pworker_send_ctl.try_to_wake_up_worker();
+	}
+
+	ImGui::SameLine();
+
+	if(ImGui::Button("send all captured packet")){
+		{
+			std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+
+			if(ctx.pworker_send_ctl.handle.is_ok() && ctx.pworker_send_ctl.handle.get_handle()){
+				for(auto &&e : pkt_vec){
+					ctx.pworker_send_ctl.pkt_vec.push_back(e.pktdata);
+				}
+			}
+		}
+
+		ctx.pworker_send_ctl.try_to_wake_up_worker();
+	}
+
+	ImGui::SameLine();
+
+	if(ImGui::Button("clear sending packet")){
+		std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+		ctx.pworker_send_ctl.pkt_vec.clear();
+	}
+
+	if(ImGui::Button("reset error_number")){
+		std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+		ctx.pworker_send_ctl.error_number = 0;
+	}
+
+	{
+		std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+		ImGui::Text("waiting for sending: %ld",ctx.pworker_send_ctl.pkt_vec.size());
+		ImGui::Text("error_number: %ld", ctx.pworker_send_ctl.error_number);
+	}
+
+
+	//show pkt data
+	ImGui::SeparatorText("capture pktdata");
+
+	static size_t pkt_offset = 0;
+	size_t min=0, max=pkt_vec.size() == 0?0:pkt_vec.size()-1;
+
+	ImGui::SliderScalar("content offset", ImGuiDataType_U32, &pkt_offset, &min, &max);
+	ImGui::Separator();
+	for(size_t i=pkt_offset;i < std::min<size_t>(pkt_offset+30,pkt_vec.size());i++){
+		auto &e = pkt_vec[i];
+
+		std::string label = std::format(
+				"index:{:d} ret:{:d} len:{:d} time:{:d}:{:d}",
+				i,
+				e.ret_value,
+				e.pkthdr.len,
+				e.pkthdr.ts.tv_sec,
+				e.pkthdr.ts.tv_usec
+		);
+
+		if(ImGui::CollapsingHeader(label.c_str())){
+			for(int j=0;j<e.pktdata.size();j++){
+				if(j && j%16 != 0){
+					ImGui::SameLine();
+
+					if(j%8 == 0){
+						ImGui::PushID(i);
+						ImGui::PushID(j);
+						ImGui::Selectable(" ",false,0,{ctx.sgicm.fontsize,0});
+						ImGui::PopID();
+						ImGui::PopID();
+						ImGui::SameLine();
+					}
+				}
+
+				char buf[3];
+				snprintf(buf,3,"%02x",e.pktdata[j]);
+
+				ImGui::PushID(i);
+				ImGui::PushID(j);
+				ImGui::Selectable(buf,false,0,{ctx.sgicm.fontsize,0});
+				ImGui::PopID();
+				ImGui::PopID();
+			}
+		}
+	}
+
 
 }
 
@@ -2047,5 +2475,22 @@ void ColorfulStyle(){
 	style.HoverDelayNormal = 0.4000f;
 	style.HoverFlagsForTooltipMouse = (ImGuiHoveredFlags)41984;
 	style.HoverFlagsForTooltipNav = (ImGuiHoveredFlags)197632;
+}
+
+
+//loop will be called at the upper level
+void core::sdl_event_manager::loop() {
+	prepare prepare;
+	frame frame;
+
+	prepare.all(ctx);
+
+	while(ctx.running && ctx.status){
+		frame.one_frame(ctx);
+	}
+
+	//handle end: thread related
+	ctx.pworker_recv_ctl.breakloop();
+
 }
 

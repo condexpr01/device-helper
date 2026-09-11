@@ -11,7 +11,9 @@ endif()
 
 #cross compile
 if(CROSS_MINGW OR CMAKE_HOST_SYSTEM_NAME MATCHES "MSYS|CYGWIN")
+	set(CROSS_MINGW ON)
 	message(STATUS "cross mingw")
+
 	#libromfs flags
 	set(NATIVE_CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
 	set(NATIVE_CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
@@ -24,13 +26,15 @@ if(CROSS_MINGW OR CMAKE_HOST_SYSTEM_NAME MATCHES "MSYS|CYGWIN")
 	set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
 
 	#cross compile on linux
-	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+		message(STATUS "linux x86_64-w64-mingw32")
 		set(CMAKE_FIND_ROOT_PATH /usr/x86_64-w64-mingw32)
 		set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 		set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 		set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 		set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 	endif()
+
 endif()
 
 #proj, ver
@@ -69,6 +73,8 @@ target_sources(${PROJECT_NAME}
 	PRIVATE src/imgui/imgui_impl_opengl3.cpp
 	PRIVATE src/imgui/imgui_impl_sdl3.cpp
 
+	PRIVATE src/imgui/imgui_stdlib.cpp
+
 	#PRIVATE src/imgui/implot.cpp
 	#PRIVATE src/imgui/implot_demo.cpp
 	#PRIVATE src/imgui/implot_items.cpp
@@ -104,11 +110,11 @@ target_sources(${PROJECT_NAME}
 set(LIBROMFS_PROJECT_NAME ${PROJECT_NAME})
 set(LIBROMFS_RESOURCE_LOCATION "${CMAKE_SOURCE_DIR}/romfs")
 add_subdirectory(libromfs)
-target_link_libraries(${PROJECT_NAME} ${LIBROMFS_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBROMFS_LIBRARY})
 
 #gl
 find_package(OpenGL REQUIRED)
-target_link_libraries(${PROJECT_NAME} OpenGL::GL)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
 
 
 ########include fetch content#######
@@ -143,11 +149,13 @@ if(WIN32)
 		target_link_options(${PROJECT_NAME} PRIVATE -static -mwindows)
 	endif()
 
-	target_link_libraries(${PROJECT_NAME} SDL3::SDL3-static)
+	target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3-static)
 
 else()
-	target_link_libraries(${PROJECT_NAME} SDL3::SDL3)
+	target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 endif()
+
+
 
 #glm
 find_package(glm)
@@ -161,6 +169,39 @@ if(NOT glm_FOUND)
 	FetchContent_MakeAvailable(glm)
 	target_include_directories(${PROJECT_NAME} PRIVATE ${glm_SOURCE_DIR})
 endif()
+
+# win socket
+if(WIN32)
+	target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
+endif()
+
+#pcap
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+	if(CROSS_MINGW)
+		set(ENV{PKG_CONFIG_LIBDIR} "/usr/x86_64-w64-mingw32/lib/pkgconfig")
+		set(ENV{PKG_CONFIG_SYSROOT_DIR} "/usr/x86_64-w64-mingw32")
+	endif()
+
+	pkg_check_modules(PCAP IMPORTED_TARGET libpcap)
+endif()
+
+if(PCAP_FOUND)
+	target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::PCAP)
+elseif(FALSE)
+	FetchContent_Declare(pcap
+		GIT_REPOSITORY https://github.com/the-tcpdump-group/libpcap
+		#GIT_REPOSITORY git@github.com:the-tcpdump-group/libpcap
+		#GIT_REPOSITORY file:///home/condexpr01/Desktop/fakerepos/clone/libpcap/.git
+		GIT_TAG master
+		)
+
+	FetchContent_MakeAvailable(pcap)
+	target_link_libraries(${PROJECT_NAME} PRIVATE pcap)
+	#target_link_libraries(${PROJECT_NAME} PRIVATE pcap_static)
+endif()
+
+
 
 # check variables in the end
 if(OFF)
