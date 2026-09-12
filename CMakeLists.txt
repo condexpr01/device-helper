@@ -65,6 +65,9 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_sources(${PROJECT_NAME}
+	PRIVATE src/core/main.cpp
+	PRIVATE src/core/loop.cpp
+
 	PRIVATE src/imgui/imgui.cpp
 	PRIVATE src/imgui/imgui_demo.cpp
 	PRIVATE src/imgui/imgui_draw.cpp
@@ -100,12 +103,6 @@ target_sources(${PROJECT_NAME}
 )
 
 
-target_sources(${PROJECT_NAME}
-	PRIVATE src/core/main.cpp
-	PRIVATE src/core/loop.cpp
-)
-
-
 #libromfs
 set(LIBROMFS_PROJECT_NAME ${PROJECT_NAME})
 set(LIBROMFS_RESOURCE_LOCATION "${CMAKE_SOURCE_DIR}/romfs")
@@ -114,8 +111,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBROMFS_LIBRARY})
 
 #gl
 find_package(OpenGL REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
-
+if(OpenGL_FOUND)
+	target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+endif()
 
 ########include fetch content#######
 #set(GIT_EXECUTABLE C:\\msys64\\usr\\bin\\git.exe)
@@ -170,25 +168,42 @@ if(NOT glm_FOUND)
 	target_include_directories(${PROJECT_NAME} PRIVATE ${glm_SOURCE_DIR})
 endif()
 
-# win socket
-if(WIN32)
-	target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
-endif()
 
 #pcap
-find_package(PkgConfig)
-if(PkgConfig_FOUND)
-	if(CROSS_MINGW)
-		set(ENV{PKG_CONFIG_LIBDIR} "/usr/x86_64-w64-mingw32/lib/pkgconfig")
-		set(ENV{PKG_CONFIG_SYSROOT_DIR} "/usr/x86_64-w64-mingw32")
+if(WIN32)
+	set(PCAP_FOUND ON) #prevent fetch
+
+	if(PCAP_ROOT)
+		target_include_directories(${PROJECT_NAME}
+			PRIVATE ${PCAP_ROOT}/Include
+		)
+
+		target_link_directories(${PROJECT_NAME}
+			PRIVATE ${PCAP_ROOT}/Lib/x64
+		)
+
+		target_link_libraries(${PROJECT_NAME} PRIVATE wpcap.lib Packet.lib ws2_32)
+	else()
+
+		message(FATAL_ERROR "(Windows)compile needs -DPCAP_ROOT=<NPcap-SDK-dir>")
+		RETURN()
+
 	endif()
 
-	pkg_check_modules(PCAP IMPORTED_TARGET libpcap)
+else()
+
+	find_package(PkgConfig)
+	if(PkgConfig_FOUND)
+		pkg_check_modules(PCAP IMPORTED_TARGET libpcap)
+	endif()
+
+	if(PCAP_FOUND)
+		target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::PCAP)
+	endif()
+
 endif()
 
-if(PCAP_FOUND)
-	target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::PCAP)
-elseif(FALSE)
+if(NOT PCAP_FOUND)
 	FetchContent_Declare(pcap
 		GIT_REPOSITORY https://github.com/the-tcpdump-group/libpcap
 		#GIT_REPOSITORY git@github.com:the-tcpdump-group/libpcap
@@ -197,20 +212,8 @@ elseif(FALSE)
 		)
 
 	FetchContent_MakeAvailable(pcap)
-	target_link_libraries(${PROJECT_NAME} PRIVATE pcap)
-	#target_link_libraries(${PROJECT_NAME} PRIVATE pcap_static)
+
+	#target_link_libraries(${PROJECT_NAME} PRIVATE pcap)
+	target_link_libraries(${PROJECT_NAME} PRIVATE pcap_static)
 endif()
 
-
-
-# check variables in the end
-if(OFF)
-	get_cmake_property(_variableNames VARIABLES)
-	list (SORT _variableNames)
-	foreach (_variableName ${_variableNames})
-		message(STATUS "${_variableName}=${${_variableName}}")
-	endforeach()
-endif()
-
-#find_package(md4c REQUIRED)
-#target_link_libraries(${PROJECT_NAME} md4c::md4c)

@@ -504,9 +504,10 @@ namespace core{
 
 							handle.activate();
 
+							//handle.setdirection(PCAP_D_INOUT);
+
 							//after activating
 							handle.setnonblock(1);
-							handle.setdirection(PCAP_D_INOUT);
 
 							hc = HANDLE_NONE;
 
@@ -654,8 +655,9 @@ namespace core{
 
 							handle.activate();
 
+							//handle.setdirection(PCAP_D_OUT);
+
 							handle.setnonblock(1);
-							handle.setdirection(PCAP_D_OUT);
 
 							hc = HANDLE_NONE;
 						}else if(hc == HANDLE_CLOSE){
@@ -710,7 +712,10 @@ namespace core{
 									pkt_vec.pop_front();
 								}else{
 									retries++;
-									std::this_thread::sleep_for(std::chrono::microseconds{10});
+
+									if(pkt_buf.size() > 1280 + 14){
+										std::this_thread::sleep_for(std::chrono::microseconds{10});
+									}
 								}
 							}
 

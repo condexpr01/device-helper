@@ -3,6 +3,7 @@ all:
 
 cross-mingw:
 	#cross compile on linux:
+	#need -DPCAP_ROOT=npcap-sdk-dir 
 	cmake -S . -B build -G Ninja -DCROSS_MINGW=ON && cmake --build build
 
 clean:
