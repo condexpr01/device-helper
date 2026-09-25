@@ -1209,8 +1209,8 @@ void page_sdl_audio_content(core::sdl_event_ctx &ctx){
 			ImGui::SameLine();
 			if (ImGui::Button("reset")){ctx.realtime_audio.reset_status();}
 
-			gain = ctx.realtime_audio.get_volumn();
-			if(ImGui::DragFloat("volumn gain",&gain,0.01f,0.f,10.f)){ctx.realtime_audio.volumn(gain);}
+			gain = ctx.realtime_audio.get_volume();
+			if(ImGui::DragFloat("volume gain",&gain,0.01f,0.f,10.f)){ctx.realtime_audio.volume(gain);}
 			ImGui::ProgressBar(gain/10.f);
 			ImGui::PopID();
 			#endif
@@ -1257,9 +1257,9 @@ void page_sdl_audio_content(core::sdl_event_ctx &ctx){
 			ImGui::SameLine();
 			if (ImGui::Button("reset")){ctx.callback_on_time_audio.reset_status();}
 
-			gain = ctx.callback_on_time_audio.get_volumn();
-			if(ImGui::DragFloat("volumn gain",&gain,0.01f,0.f,10.f)){
-				ctx.callback_on_time_audio.volumn(gain);
+			gain = ctx.callback_on_time_audio.get_volume();
+			if(ImGui::DragFloat("volume gain",&gain,0.01f,0.f,10.f)){
+				ctx.callback_on_time_audio.volume(gain);
 			}
 			ImGui::ProgressBar(gain/10.f);
 			ImGui::PopID();
@@ -1316,8 +1316,8 @@ void page_sdl_audio_content(core::sdl_event_ctx &ctx){
 
 			if (ImGui::Button("clear buf")){ctx.recording_audio.clear_buf();}
 
-			gain = ctx.recording_audio.get_volumn();
-			if(ImGui::DragFloat("volumn gain",&gain,0.01f,0.f,10.f)){ctx.recording_audio.volumn(gain);}
+			gain = ctx.recording_audio.get_volume();
+			if(ImGui::DragFloat("volume gain",&gain,0.01f,0.f,10.f)){ctx.recording_audio.volume(gain);}
 			ImGui::ProgressBar(gain/10.f);
 			ImGui::PopID();
 			#endif

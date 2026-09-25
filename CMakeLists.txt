@@ -185,7 +185,10 @@ if(WIN32)
 		target_link_libraries(${PROJECT_NAME} PRIVATE wpcap.lib Packet.lib ws2_32)
 	else()
 
-		message(FATAL_ERROR "(Windows)compile needs -DPCAP_ROOT=<NPcap-SDK-dir>")
+		message(
+			FATAL_ERROR
+			"(Windows needs)-DPCAP_ROOT=<NPcap-SDK-dir(https://npcap.com/#download)>"
+		)
 		RETURN()
 
 	endif()
