@@ -1459,7 +1459,14 @@ void page_sdl_camera_content(core::sdl_event_ctx &ctx){
 		}
 
 		ImVec2 avail = ImGui::GetContentRegionAvail();
-		ImGui::Image(ctx.frame_tex.id(),ImVec2{avail.x,(fw==0.f?0.f:fh/fw)*avail.x});
+
+		//mirror
+		ImGui::Image(ctx.frame_tex.id(),
+			ImVec2{avail.x,(fw==0.f?0.f:fh/fw)*avail.x},
+			ImVec2{1,0},
+			ImVec2{0,1}
+		);
+
 		if(ImGui::Button("clear frame")){
 			fw=fh=0.f;
 			ctx.frame_tex.image2d(0,GL_RGBA,fw,fh,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);
