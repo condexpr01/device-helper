@@ -3,7 +3,8 @@
 all: build
 
 compile:
-	cmake -S . -B build -G Ninja -DNPCAP_SDK_ROOT=./npcap-sdk -DCMAKE_BUILD_TYPE=Release
+	#-DNPCAP_SDK_ROOT=./npcap-sdk
+	cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
 
 build: compile

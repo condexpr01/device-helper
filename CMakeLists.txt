@@ -1,5 +1,5 @@
 # debug
-if(ON)
+if(OFF)
 	set(CMAKE_CXX_COMPILER clang++)
 	set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 	set(CMAKE_BUILD_TYPE Debug)
@@ -95,16 +95,17 @@ endif()
 ##########clone################
 find_program(GIT_EXECUTABLE git git.cmd)
 
-#set(SDL_REPO "https://github.com/libsdl-org/SDL.git")
+set(SDL_REPO "https://github.com/libsdl-org/SDL.git")
 #set(SDL_REPO "git@github.com:libsdl-org/SDL.git")
-set(SDL_REPO "file:////home/condexpr01/Desktop/clonerepos/SDL/.git")
+#set(SDL_REPO "file:////home/condexpr01/Desktop/clonerepos/SDL/.git")
 
-#GIT_REPOSITORY git@github.com:g-truc/glm.git
-set(GLM_REPO "file:////home/condexpr01/Desktop/clonerepos/glm/.git")
+set(GLM_REPO "https://github.com/g-truc/glm.git")
+#set(GLM_REPO "git@github.com:g-truc/glm.git")
+#set(GLM_REPO "file:////home/condexpr01/Desktop/clonerepos/glm/.git")
 
-#GIT_REPOSITORY git@github.com:the-tcpdump-group/libpcap
+set(PCAP_REPO "https://github.com/the-tcpdump-group/libpcap")
+#set(PCAP_REPO "git@github.com:the-tcpdump-group/libpcap")
 #set(PCAP_REPO "file:////home/condexpr01/Desktop/clonerepos/libpcap/.git")
-set(PCAP_REPO "git@github.com:the-tcpdump-group/libpcap")
 
 
 set(SDL_CLONE_DIR "${CMAKE_SOURCE_DIR}/clone/SDL")
