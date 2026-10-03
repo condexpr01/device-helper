@@ -1952,6 +1952,13 @@ void page_pcap_content(core::sdl_event_ctx &ctx){
 	//cap dev
 	ImGui::SeparatorText("capture device");
 
+	if(static bool is_rfmon = false;ImGui::Toggle("rfmon when create recv",&is_rfmon)){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
+			ctx.pworker_recv_ctl.refmon_when_create = is_rfmon;
+		}
+	}
+
 	if(ImGui::Button("create and activate recv handle(selected dev)[sudo/admin required]") && cur_dev){
 		{//lock area
 			std::lock_guard<std::mutex> lock{ctx.pworker_recv_ctl.status.mtx};
@@ -2025,6 +2032,13 @@ void page_pcap_content(core::sdl_event_ctx &ctx){
 
 	//send
 	ImGui::SeparatorText("sending device");
+
+	if(static bool is_rfmon = false;ImGui::Toggle("rfmon when create send",&is_rfmon)){
+		{//lock area
+			std::lock_guard<std::mutex> lock{ctx.pworker_send_ctl.status.mtx};
+			ctx.pworker_send_ctl.refmon_when_create = is_rfmon;
+		}
+	}
 
 	if(ImGui::Button("create and activate sending handle(selected dev)[sudo/admin required]") && cur_dev){
 		{//lock area

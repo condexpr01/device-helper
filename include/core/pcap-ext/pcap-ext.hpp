@@ -469,6 +469,9 @@ namespace core{
 			//handle manager
 			core::pcap_ext_handle handle;
 
+			//set_rfmon when creating done
+			bool refmon_when_create = false;
+
 			//thread push data in, and main thread pop data out
 			std::vector<struct pkt_element> pkt_vec;
 
@@ -498,9 +501,10 @@ namespace core{
 							handle.set_snaplen(65535);
 
 							//handle.set_promisc(1);
-							#if 0
-							handle.set_rfmon(1);
-							#endif
+
+							if(refmon_when_create){
+								handle.set_rfmon(1);
+							}
 
 							handle.activate();
 
@@ -625,6 +629,8 @@ namespace core{
 			//handle manager
 			core::pcap_ext_handle handle;
 
+			bool refmon_when_create = false;
+
 			//dev(gived by main thread)
 			std::string devname;
 			enum handle_ctl{HANDLE_NONE, HANDLE_CREATE_AND_ACTIVATE, HANDLE_CLOSE} hc = HANDLE_NONE;
@@ -649,9 +655,9 @@ namespace core{
 						if(hc == HANDLE_CREATE_AND_ACTIVATE){
 							handle.create(devname.c_str());
 
-							#if 0
-							handle.set_rfmon(1);
-							#endif
+							if(refmon_when_create){
+								handle.set_rfmon(1);
+							}
 
 							handle.activate();
 

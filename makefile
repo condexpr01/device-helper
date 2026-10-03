@@ -1,17 +1,20 @@
-all:
-	cmake -S . -B build -G Ninja && cmake --build build
+.PHONY: all compile build clean run
 
-cross-mingw:
-	#cross compile on linux:
-	#need -DPCAP_ROOT=npcap-sdk-dir 
-	cmake -S . -B build -G Ninja -DCROSS_MINGW=ON && cmake --build build
+all: build
+
+compile:
+	cmake -S . -B build -G Ninja -DNPCAP_SDK_ROOT=./npcap-sdk -DCMAKE_BUILD_TYPE=Release
+
+
+build: compile
+	cmake --build build --config Release
 
 clean:
-	-rm -rf build
-	
-	-rm -rf .cache
-	-rm -rf src/imgui/.cache
-	-rm -rf src/core/.cache
+	-cmake -E rm -rf build
+	-cmake -E rm -rf clone
+	-cmake -E rm -rf .cache
+	-cmake -E rm -rf src/imgui/.cache
+	-cmake -E rm -rf src/core/.cache
 
 run:
 	./build/prog
